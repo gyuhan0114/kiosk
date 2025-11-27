@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IRON GYM Kiosk</title>
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM (CDN) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel (CDN) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* 추가적인 애니메이션 효과 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            -webkit-user-select: none; /* 터치 환경 고려 드래그 방지 */
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-100">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        // --- 아이콘 컴포넌트 (Inline SVG for standalone) ---
+        const Icons = {
+            Dumbbell: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></svg>
+            ),
+            ArrowLeft: ({size=24}) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+            ),
+            Home: ({size=24}) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            ),
+            Printer: ({size=20}) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+            )
+        };
+
+        // --- 데이터: 부위별 추천 루틴 ---
+        const ROUTINES = {
+            chest: {
+                id: 'chest',
+                name: '가슴 (Chest)',
+                icon: '🏋️',
+                description: '탄탄한 흉근을 위한 미라클 모닝 루틴',
+                exercises: [
+                    { name: '벤치 프레스', sets: '4세트', reps: '8-12회', tip: '바벨을 가슴 중앙으로 내리세요.' },
+                    { name: '인클라인 덤벨 프레스', sets: '3세트', reps: '10-12회', tip: '윗가슴 자극에 집중하세요.' },
+                    { name: '체스트 프레스 머신', sets: '3세트', reps: '12-15회', tip: '초보자에게 추천합니다.' },
+                    { name: '펙 덱 플라이', sets: '3세트', reps: '15회', tip: '가슴을 모아주는 느낌으로 수행하세요.' }
+                ]
+            },
+            back: {
+                id: 'back',
+                name: '등 (Back)',
+                icon: '🦍',
+                description: '넓고 두꺼운 등을 만드는 루틴',
+                exercises: [
+                    { name: '렛 풀 다운', sets: '4세트', reps: '10-12회', tip: '견갑골을 아래로 당기세요.' },
+                    { name: '시티드 로우', sets: '3세트', reps: '10-12회', tip: '배꼽 쪽으로 당기며 등을 수축하세요.' },
+                    { name: '원 암 덤벨 로우', sets: '3세트', reps: '10회', tip: '광배근의 이완을 느껴보세요.' },
+                    { name: '백 익스텐션', sets: '3세트', reps: '15회', tip: '기립근 강화에 좋습니다.' }
+                ]
+            },
+            legs: {
+                id: 'legs',
+                name: '하체 (Legs)',
+                icon: '🦵',
+                description: '가장 많은 칼로리를 태우는 하체 루틴',
+                exercises: [
+                    { name: '바벨 스쿼트', sets: '4세트', reps: '8-10회', tip: '무릎이 발끝 방향과 같게 하세요.' },
+                    { name: '레그 프레스', sets: '4세트', reps: '10-12회', tip: '발 위치에 따라 자극 부위가 달라집니다.' },
+                    { name: '레그 익스텐션', sets: '3세트', reps: '15회', tip: '허벅지 앞쪽을 쥐어짜듯이 차올리세요.' },
+                    { name: '레그 컬', sets: '3세트', reps: '15회', tip: '햄스트링 자극에 집중하세요.' }
+                ]
+            },
+            shoulders: {
+                id: 'shoulders',
+                name: '어깨 (Shoulders)',
+                icon: '🥥',
+                description: '옷태가 사는 직각 어깨 루틴',
+                exercises: [
+                    { name: '오버헤드 프레스', sets: '4세트', reps: '8-10회', tip: '코어에 힘을 주고 수행하세요.' },
+                    { name: '사이드 레터럴 레이즈', sets: '4세트', reps: '15-20회', tip: '승모근 개입을 최소화하세요.' },
+                    { name: '덤벨 숄더 프레스', sets: '3세트', reps: '10-12회', tip: '팔꿈치 각도를 90도로 유지하세요.' },
+                    { name: '페이스 풀', sets: '3세트', reps: '15회', tip: '후면 삼각근을 타겟팅합니다.' }
+                ]
+            },
+            arms: {
+                id: 'arms',
+                name: '팔 (Arms)',
+                icon: '💪',
+                description: '꽉 찬 소매를 위한 이두/삼두 루틴',
+                exercises: [
+                    { name: '바벨 컬 (이두)', sets: '4세트', reps: '10-12회', tip: '팔꿈치를 옆구리에 고정하세요.' },
+                    { name: '케이블 푸시 다운 (삼두)', sets: '4세트', reps: '12-15회', tip: '팔을 끝까지 펴주세요.' },
+                    { name: '해머 컬', sets: '3세트', reps: '12회', tip: '전완근과 이두 바깥쪽을 자극합니다.' },
+                    { name: '벤치 딥스', sets: '3세트', reps: '10-15회', tip: '어깨 부상에 주의하며 내려가세요.' }
+                ]
+            },
+            cardio: {
+                id: 'cardio',
+                name: '유산소 (Cardio)',
+                icon: '🏃',
+                description: '체지방 연소를 위한 고강도 유산소',
+                exercises: [
+                    { name: '트레드밀 (인터벌)', sets: '20분', reps: '-', tip: '3분 걷기 / 2분 달리기를 반복하세요.' },
+                    { name: '천국의 계단', sets: '15분', reps: '-', tip: '손잡이에 기대지 말고 복부 힘으로 오르세요.' },
+                    { name: '사이클', sets: '20분', reps: '-', tip: 'RPM 60 이상 유지하세요.' }
+                ]
+            }
+        };
+
+        // --- 메인 컴포넌트 ---
+        function App() {
+            const [step, setStep] = useState('HOME'); // HOME, ATTENDANCE, SELECTION, RESULT
+            const [userId, setUserId] = useState('');
+            const [selectedRoutine, setSelectedRoutine] = useState(null);
+
+            // 화면 전환 핸들러
+            const goHome = () => {
+                setStep('HOME');
+                setUserId('');
+                setSelectedRoutine(null);
+            };
+
+            const handleAttendance = () => {
+                if (userId.length < 4) {
+                    alert('회원번호 4자리 이상 입력해주세요.');
+                    return;
+                }
+                setStep('SELECTION');
+            };
+
+            const selectRoutine = (key) => {
+                setSelectedRoutine(ROUTINES[key]);
+                setStep('RESULT');
+            };
+
+            // 1. 대기 화면 (홈)
+            if (step === 'HOME') {
+                return (
+                    <div 
+                        onClick={() => setStep('ATTENDANCE')}
+                        className="h-screen w-full bg-slate-900 text-white flex flex-col items-center justify-center cursor-pointer animate-fade-in"
+                    >
+                        <div className="mb-8 p-6 bg-blue-600 rounded-full shadow-lg shadow-blue-500/50 animate-bounce">
+                            <Icons.Dumbbell />
+                        </div>
+                        <h1 className="text-5xl font-black mb-4 tracking-tighter">IRON GYM</h1>
+                        <p className="text-xl text-slate-300 mb-12">화면을 터치하여 출석체크 하세요</p>
+                        <div className="px-8 py-3 border border-slate-600 rounded-full text-slate-400 text-sm animate-pulse">
+                            Touch Screen to Start
+                        </div>
+                    </div>
+                );
+            }
+
+            // 2. 출석 체크 화면 (키패드)
+            if (step === 'ATTENDANCE') {
+                const handleNumClick = (num) => {
+                    if (userId.length < 8) setUserId(prev => prev + num);
+                };
+                const handleDelete = () => setUserId(prev => prev.slice(0, -1));
+
+                return (
+                    <div className="h-screen w-full bg-slate-100 flex flex-col animate-fade-in">
+                        <div className="p-6 bg-white shadow-sm flex items-center">
+                            <button onClick={goHome} className="p-2 text-slate-600 hover:bg-slate-100 rounded-full">
+                                <Icons.ArrowLeft />
+                            </button>
+                            <h2 className="text-2xl font-bold ml-4 text-slate-800">회원번호 입력</h2>
+                        </div>
+
+                        <div className="flex-1 flex flex-col items-center justify-center p-6">
+                            <div className="w-full max-w-md mb-8">
+                                <div className="text-center mb-4 text-slate-500">회원번호(휴대폰 뒷자리)를 입력하세요</div>
+                                <div className="w-full h-20 bg-white border-2 border-blue-500 rounded-2xl flex items-center justify-center text-4xl font-bold tracking-widest shadow-inner text-slate-800">
+                                    {userId ? userId : <span className="text-slate-300">____</span>}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-4 w-full max-w-sm">
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                                    <button 
+                                        key={num}
+                                        onClick={() => handleNumClick(num)}
+                                        className="h-20 bg-white rounded-xl shadow-md text-2xl font-semibold text-slate-700 active:bg-slate-200 active:scale-95 transition-all"
+                                    >
+                                        {num}
+                                    </button>
+                                ))}
+                                <button 
+                                    onClick={() => setUserId('')}
+                                    className="h-20 bg-rose-50 rounded-xl shadow-md text-lg font-semibold text-rose-600 active:bg-rose-100"
+                                >
+                                    전체삭제
+                                </button>
+                                <button 
+                                    onClick={() => handleNumClick(0)}
+                                    className="h-20 bg-white rounded-xl shadow-md text-2xl font-semibold text-slate-700 active:bg-slate-200"
+                                >
+                                    0
+                                </button>
+                                <button 
+                                    onClick={handleDelete}
+                                    className="h-20 bg-slate-50 rounded-xl shadow-md text-lg font-semibold text-slate-600 active:bg-slate-100"
+                                >
+                                    ←
+                                </button>
+                            </div>
+
+                            <button 
+                                onClick={handleAttendance}
+                                className={`mt-8 w-full max-w-sm py-5 rounded-2xl text-xl font-bold text-white shadow-lg transition-all ${userId.length > 0 ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30' : 'bg-slate-300 cursor-not-allowed'}`}
+                                disabled={userId.length === 0}
+                            >
+                                출석하기
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 3. 부위 선택 화면 (수정됨: 잘림 방지)
+            if (step === 'SELECTION') {
+                return (
+                    <div className="h-screen w-full bg-slate-50 flex flex-col animate-fade-in">
+                        <div className="p-6 bg-white shadow-sm">
+                            <h2 className="text-2xl font-bold text-slate-800 text-center">
+                                {userId.slice(0, 4)}****님, 안녕하세요! 👋
+                            </h2>
+                            <p className="text-center text-slate-500 mt-1">오늘 운동할 부위를 선택해주세요.</p>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {/* 수정: h-full 및 content-center 제거하고 py-8 추가하여 스크롤 영역 확보 */}
+                            <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto py-8">
+                                {Object.keys(ROUTINES).map((key) => {
+                                    const item = ROUTINES[key];
+                                    return (
+                                        <button
+                                            key={key}
+                                            onClick={() => selectRoutine(key)}
+                                            className="aspect-square bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-4 hover:border-blue-500 hover:shadow-md hover:-translate-y-1 transition-all group"
+                                        >
+                                            <div className="text-5xl group-hover:scale-110 transition-transform">{item.icon}</div>
+                                            <div className="text-xl font-bold text-slate-700">{item.name}</div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 4. 결과 및 루틴 추천 화면
+            if (step === 'RESULT' && selectedRoutine) {
+                return (
+                    <div className="h-screen w-full bg-slate-100 flex flex-col animate-fade-in">
+                        <div className="bg-slate-900 text-white p-6 pb-12 rounded-b-3xl shadow-lg relative z-10">
+                            <div className="flex justify-between items-center mb-6">
+                                <button onClick={() => setStep('SELECTION')} className="text-slate-300 hover:text-white flex items-center gap-2">
+                                    <Icons.ArrowLeft size={20} /> 다시 선택
+                                </button>
+                                <button onClick={goHome} className="bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors">
+                                    <Icons.Home size={20} />
+                                </button>
+                            </div>
+                            <h2 className="text-3xl font-bold mb-2 flex items-center gap-3">
+                                <span>{selectedRoutine.icon}</span> {selectedRoutine.name}
+                            </h2>
+                            <p className="text-slate-400">{selectedRoutine.description}</p>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 -mt-8 relative z-20">
+                            <div className="max-w-2xl mx-auto space-y-4">
+                                {selectedRoutine.exercises.map((ex, idx) => (
+                                    <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-blue-500 flex items-start gap-4">
+                                        <div className="bg-blue-50 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0 mt-1">
+                                            {idx + 1}
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-bold text-slate-800">{ex.name}</h3>
+                                            <div className="flex gap-3 text-sm font-medium text-slate-600 mt-1 mb-2">
+                                                <span className="bg-slate-100 px-2 py-1 rounded">{ex.sets}</span>
+                                                <span className="bg-slate-100 px-2 py-1 rounded">{ex.reps}</span>
+                                            </div>
+                                            <p className="text-sm text-slate-500 bg-slate-50 p-2 rounded border border-slate-100">
+                                                💡 <span className="font-medium">Tip:</span> {ex.tip}
+                                            </p>
+                                        </div>
+                                        <div className="self-center">
+                                            <input type="checkbox" className="w-6 h-6 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <div className="max-w-2xl mx-auto mt-8 flex flex-col gap-3">
+                                <button 
+                                    onClick={() => {
+                                        alert('루틴이 출력되었습니다! (시뮬레이션)');
+                                        goHome();
+                                    }}
+                                    className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Icons.Printer size={20} /> 루틴 출력 및 종료
+                                </button>
+                                <button 
+                                    onClick={goHome}
+                                    className="w-full bg-white text-slate-600 border border-slate-200 py-4 rounded-xl font-bold text-lg hover:bg-slate-50 transition-colors"
+                                >
+                                    처음으로 돌아가기
+                                </button>
+                            </div>
+                            <div className="h-10"></div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return null;
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
